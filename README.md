@@ -1,6 +1,6 @@
 #### 深入浅出理解消息的传递和转发机制
 ##### 前言
-在面试过程中你也许会被问到消息转发机制。这篇文章就是对消息的转发机制进行一个梳理。主要包括什么是消息、静态绑定/动态绑定、消息的传递和消息的转发。接下来开发进入正题。
+在面试过程中你也许会被问到消息转发机制。这篇文章就是对消息的转发机制进行一个梳理。主要包括什么是消息、静态绑定/动态绑定、消息的传递和消息的转发。接下来开始进入正题。
 ##### 消息的解释
 在其他语言里面，我们可以用一个类去调用某个方法，在OC里面，这个方法就是消息。某个类调用一个方法就是向这个类发送一条消息。举个例子：
 ```objective-c
@@ -12,7 +12,7 @@ People *lisi = [[People alloc] init];
 ```objective-c
 [zhangSan performSelector:@selector(beFriendWith:) withObject:lisi];
 ```
-其目和上面的一样，都是向zhangSan发送了一条beFriendWith:的消息，传人的参数都是lisi。
+其目的和上面的一样，都是向zhangSan发送了一条beFriendWith:的消息，传人的参数都是lisi。
 这里简单介绍一下SEL和IMP：
 >SEL:类成员方法的指针，但和C的函数指针还不一样，函数指针直接保存了方法的地址，但是SEL只是方法编号。
 >IMP:函数指针，保存了方法地址。
@@ -73,11 +73,11 @@ objc_msgSend可以在objc里面的message.h中看到:
 根据官方注释可以看到：
 >When it encounters a method call, the compiler generates a call to one of the functions objc_msgSend, objc_msgSend_stret, objc_msgSendSuper, or objc_msgSendSuper_stret. Messages sent to an object’s superclass (using the super keyword) are sent using objc_msgSendSuper; other messages are sent using objc_msgSend. Methods that have data structures as return values are sent using objc_msgSendSuper_stret and objc_msgSend_stret.
 
-它的作用是向一个实例类发送一个带有简单返回值的message。是一个参数个数不定的函数。当遇到一个方法调用，编译器会生成一个objc_msgSend的调用，有：objc_msgSend_stret、objc_msgSendSuper或者是objc_msgSendSuper_stret。发送个父类的message会使用objc_msgSendSuper，其他的消息会使用objc_msgSend。如果方法的返回值是一个结构体(structures)，那么就会使用objc_msgSendSuper_stret或者objc_msgSend_stret。
+它的作用是向一个实例类发送一个带有简单返回值的message。是一个参数个数不定的函数。当遇到一个方法调用，编译器会生成一个objc_msgSend的调用，有：objc_msgSend_stret、objc_msgSendSuper或者是objc_msgSendSuper_stret。发送给父类的message会使用objc_msgSendSuper，其他的消息会使用objc_msgSend。如果方法的返回值是一个结构体(structures)，那么就会使用objc_msgSendSuper_stret或者objc_msgSend_stret。
 第一个参数是：指向接收该消息的类的实例的指针
 第二个参数是：要处理的消息的selector。
 其他的就是要传入的参数。
-这样消息派发系统就在接收者所属类中查找器方法列表，如果找到和选择器名称相符的方法就跳转其实现代码，如果找不到，就再起父类找，等找到合适的方法在跳转到实现代码。这里跳转到实现代码这一操作利用了[尾递归优化](http://www.cnblogs.com/zhanggui/p/7722541.html)。
+这样消息派发系统就在接收者所属类中查找器方法列表，如果找到和选择器名称相符的方法就跳转其实现代码，如果找不到，就再其父类找，等找到合适的方法在跳转到实现代码。这里跳转到实现代码这一操作利用了[尾递归优化](http://www.cnblogs.com/zhanggui/p/7722541.html)。
 如果该消息无法被该类或者其父类解读，就会开始进行消息转发。
 ##### 理解消息转发机制(message forwarding)
 ###### 动态方法解析
@@ -108,7 +108,7 @@ void gotoSchool(id self,SEL _cmd,id value) {
 + (BOOL)resolveInstanceMethod:(SEL)sel OBJC_AVAILABLE(10.5, 2.0, 9.0, 1.0, 2.0);
 + (BOOL)resolveClassMethod:(SEL)sel OBJC_AVAILABLE(10.5, 2.0, 9.0, 1.0, 2.0);
 ```
-这个方法是objc里面NSObject.h里面的方法。从字面理解就是处理实例方法(处理类方法)。下面是对其的介绍：
+这个方法是objc里面NSObject.h里面的方法。从字面理解就是处理实例方法(处理类方法)。下面左边图是对其的介绍：
 ![resolveInstanceMethod／forwardingTargetForSelector:](https://raw.githubusercontent.com/ScottZg/MarkDownResource/master/messageforward/resolveInstanceMethod.png)
 它的作用就是给一个实例方法（给定的选择器）动态提供一个实现。注释也提供了一个demo告诉我们如何动态添加实现。
 也就是说当消息传递无法处理的时候，首先会看一下所属类，是否能动态添加方法，以处理当前未知的选择子。这个过程叫做“动态方法解析”(dynamic method resolution)。
@@ -151,29 +151,28 @@ void gotoSchool(id self,SEL _cmd,id value) {
 再次运行程序，发现程序没有崩溃，只不过打印出来了“gotoschool can't handle by People”。
 forwardInvocation:方法是将消息转发给其他对象。
 ![forwardInvocation:](https://raw.githubusercontent.com/ScottZg/MarkDownResource/master/messageforward/forwardInvocation.png)
-从注释看：对一个你的对象不识别的消息进行相应，你必须重写methodSignatureForSelector:方法，该方法返回一个NSMethodSIgnature对象，该对象包含了给定选择器所标识方法的描述。主要包含返回值的信息和参数信息。
+从注释看：对一个你的对象不识别的消息进行响应，你必须重写methodSignatureForSelector:方法，该方法返回一个NSMethodSIgnature对象，该对象包含了给定选择器所标识方法的描述。主要包含返回值的信息和参数信息。
 实现forwardInvocation:方法时，若发现调用的message不是由本类处理，则续调用超类的同名方法。这样所有父类均有机会处理此消息，直到NSObject。如果最后调用了NSObject的方法，那么该方法就会调用“doesNotRecognizerSelector：”，抛出异常，标明选择器最终未能得到处理。也就是上面的crash:NSInvalidArgumentException。
-至此，真个消息转发全流程结束。
+至此，整个消息转发全流程结束。
 上一个王图：
 ![消息转发全流程](https://raw.githubusercontent.com/ScottZg/MarkDownResource/master/messageforward/allprocess.png)
 #### 总结
-接收者在每一步都有机会对未知消息进行处理，一句话：越早处理越好。如果能在第一步做完，就不进行其他操作，因为动态方法解析会将此方法缓存。如果动态方法解析不了，就放到第二步备援接收者，因为第三步还要创建完整的NSInvocation。    
+接收者在每一步都有机会对未知消息进行处理，一句话：越早处理越好。如果能在第一步做完，就不进行其他操作，因为动态方法解析会将此方法缓存。如果动态方法解析不了，就放到第二步备援接收者，因为第三步还要创建完整的NSInvocation。   
 
-在完整来一遍：    
+在完整来一遍   
+
 Q:说一下你理解的消息转发机制？    
-A:    
-先会调用objc_msgSend方法，首先在Class中的缓存查找IMP，没有缓存则初始化缓存。如果没有找到，则向父类的Class查找。如果一直查找到根类仍旧没有实现，则执行消息转发。    
+   
+A:       
+先会调用objc_msgSend方法，首先在Class中的缓存查找IMP，没有缓存则初始化缓存。如果没有找到，则向父类的Class查找。如果一直查找到根类仍旧没有实现，则执行消息转发。  
 
-1、调用resolveInstanceMethod：方法。允许用户在此时为该Class动态添加实现。如果有实现了，则调用并返回YES，重新开始objc_msgSend流程。这次对象会响应这个选择器，一般是因为它已经调用过了class_addMethod。如果仍没有实现，继续下面的动作。    
+1、调用resolveInstanceMethod：方法。允许用户在此时为该Class动态添加实现。如果有实现了，则调用并返回YES，重新开始objc_msgSend流程。这次对象会响应这个选择器，一般是因为它已经调用过了class_addMethod。如果仍没有实现，继续下面的动作。   
 
-2、调用forwardingTargetForSelector:方法，尝试找到一个能响应该消息的对象。如果获取到，则直接把消息转发给它，返回非nil对象。否则返回nil，继续下面的动作。注意这里不要返回self，否则会形成死循环。    
+2、调用forwardingTargetForSelector:方法，尝试找到一个能响应该消息的对象。如果获取到，则直接把消息转发给它，返回非nil对象。否则返回nil，继续下面的动作。注意这里不要返回self，否则会形成死循环。   
 
-3、调用methodSignatureForSelector:方法，尝试获得一个方法签名。如果获取不到，则直接调用doesNotRecognizeSelector抛出异常。如果能获取，则返回非nil;传给一个NSInvocation并传给forwardInvocation：。    
+3、调用methodSignatureForSelector:方法，尝试获得一个方法签名。如果获取不到，则直接调用doesNotRecognizeSelector抛出异常。如果能获取，则返回非nil;传给一个NSInvocation并传给forwardInvocation：。   
 
-4、调用forwardInvocation:方法，将第三步获取到的方法签名包装成Invocation传入，如何处理就在这里面了，并返回非nil。    
+4、调用forwardInvocation:方法，将第三步获取到的方法签名包装成Invocation传入，如何处理就在这里面了，并返回非nil。   
 
-5、调用doesNotRecognizeSelector：，默认的实现是抛出异常。如果第三步没能获得一个方法签名，执行该步骤 。    
+5、调用doesNotRecognizeSelector：，默认的实现是抛出异常。如果第三步没能获得一个方法签名，执行该步骤 。  
 
-
-另附相关[杂乱代码](https://github.com/ScottZg/messageForward)(里面有动态方法解析demo)。
-转载请注明来源：[http://www.cnblogs.com/zhanggui/p/7731394.html](http://www.cnblogs.com/zhanggui/p/7731394.html)
